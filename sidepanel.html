@@ -5,126 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Tokopedia Scraper</title>
   <link rel="stylesheet" href="styles.css">
-  <style>
-    /* Styling tambahan inline untuk struktur layout */
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      padding: 12px;
-      background: #f8f9fa;
-      color: #333;
-      margin: 0;
-    }
-    .container {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
-    h2 {
-      margin: 0;
-      color: #00AA5B; /* Tokopedia Green */
-      font-size: 16px;
-      border-bottom: 2px solid #e0e0e0;
-      padding-bottom: 8px;
-    }
-    
-    /* Tombol Utama */
-    .controls {
-      display: flex;
-      gap: 8px;
-    }
-    .btn {
-      flex: 1;
-      padding: 10px;
-      border: none;
-      border-radius: 6px;
-      cursor: pointer;
-      font-weight: 600;
-      font-size: 12px;
-      color: white;
-      transition: opacity 0.2s;
-    }
-    .btn:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-    .btn:hover:not(:disabled) {
-      opacity: 0.9;
-    }
-    .primary { background: #00AA5B; }
-    .success { background: #2f80ed; }
-    .danger { background: #E02954; }
-
-    /* Panel Otomasi */
-    .automation-panel {
-      padding: 12px;
-      background: #fff3e0;
-      border: 1px solid #ffe0b2;
-      border-radius: 6px;
-    }
-    .automation-panel h3 {
-      margin: 0 0 10px 0; 
-      font-size: 12px; 
-      color: #e65100;
-      display: flex;
-      align-items: center;
-      gap: 5px;
-    }
-    .input-group {
-      display: flex;
-      gap: 8px;
-      margin-bottom: 10px;
-    }
-    .input-wrapper {
-      flex: 1;
-    }
-    .input-wrapper label {
-      font-size: 10px;
-      display: block;
-      margin-bottom: 2px;
-      color: #666;
-    }
-    .input-wrapper input {
-      width: 100%;
-      box-sizing: border-box;
-      padding: 4px;
-      border: 1px solid #ddd;
-      border-radius: 4px;
-    }
-
-    /* Statistik & Status */
-    .stats {
-      font-size: 11px;
-      color: #555;
-      background: white;
-      padding: 10px;
-      border-radius: 6px;
-      box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-    }
-    .stats p { margin: 4px 0; }
-    #count { font-weight: bold; color: #333; }
-
-    /* Area Hasil */
-    .results-area {
-      height: 400px;
-      overflow-y: auto;
-      background: white;
-      padding: 0;
-      border-radius: 6px;
-      border: 1px solid #eee;
-    }
-    
-    /* Indikator Halaman */
-    .page-info {
-      padding: 8px;
-      border-radius: 4px;
-      font-size: 11px;
-      font-weight: bold;
-      border: 1px solid #ddd;
-      text-align: center;
-      background: #f5f5f5;
-      color: #666;
-    }
-  </style>
 </head>
 <body>
   <div class="container">
@@ -141,46 +21,47 @@
     
     <div class="automation-panel">
       <h3>🤖 Auto Detail Scraper</h3>
-      
       <div class="input-group">
         <div class="input-wrapper">
-          <label>Min Delay (detik)</label>
+          <label>Min Delay (s)</label>
           <input type="number" id="delayMin" value="3" min="1">
         </div>
         <div class="input-wrapper">
-          <label>Max Delay (detik)</label>
+          <label>Max Delay (s)</label>
           <input type="number" id="delayMax" value="6" min="1">
         </div>
       </div>
-
       <div style="display: flex; gap: 5px;">
         <button id="btnAutoStart" class="btn" style="background: #e65100; color: white; flex: 2;">▶ Mulai Auto</button>
         <button id="btnAutoStop" class="btn danger" style="flex: 1;" disabled>⏹ Stop</button>
       </div>
-      <div id="auto-status" style="font-size: 10px; color: #666; margin-top: 8px; font-style: italic; text-align: center;">
-        Standby.
-      </div>
+      <div id="auto-status" class="auto-status-text">Standby.</div>
+    </div>
+
+    <div class="search-wrapper">
+      <input type="text" id="searchInput" placeholder="Cari nama, harga, atau toko..." autocomplete="off">
+      <label class="toggle-not-btn" title="Mode NOT: Sembunyikan yang cocok">
+        <input type="checkbox" id="toggleNot">
+        <span class="slider-label">NOT</span>
+      </label>
+    </div>
+
+    <div class="sort-wrapper">
+      <select id="sortBy" class="sort-select">
+        <option value="newest">🕒 Terbaru Masuk</option>
+        <option value="price">💰 Harga</option>
+        <option value="rating">⭐ Rating</option>
+        <option value="sold">📦 Terjual</option>
+      </select>
+      <select id="sortOrder" class="sort-select">
+        <option value="desc">⬇ Tertinggi/Terbaru</option>
+        <option value="asc">⬆ Terendah/Terlama</option>
+      </select>
     </div>
 
     <div class="stats">
-      <p>Total Item: <span id="count">0</span></p>
+      <p>Total Item: <span id="count">0</span> <span id="filtered-count" style="display:none; color:#888;"></span></p>
       <p>Status: <span id="status-msg" style="color: #666;">Siap.</span></p>
-    </div>
-
-    <div class="stats">
-        <p>Total Item: <span id="count">0</span> <span id="filtered-count" style="font-weight:normal; color:#888; display:none;"></span></p>
-        <p>Status: <span id="status-msg" style="color: #666;">Siap.</span></p>
-        </div>
-
-        <div class="search-wrapper">
-        <input type="text" id="searchInput" placeholder="Cari nama, harga, atau toko..." autocomplete="off">
-        
-        <label class="toggle-not-btn" title="Mode NOT: Sembunyikan yang cocok">
-            <input type="checkbox" id="toggleNot">
-            <span class="slider-label">NOT</span>
-        </label>
-        </div>
-        <div id="results" class="results-area"></div>
     </div>
 
     <div id="results" class="results-area"></div>

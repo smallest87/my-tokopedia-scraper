@@ -1,139 +1,156 @@
-body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; padding: 10px; background: #f3f4f6; }
+/* RESET & BASE */
+body { 
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
+  padding: 12px; 
+  background: #f8f9fa; 
+  color: #333; 
+  margin: 0;
+}
+
 .container { display: flex; flex-direction: column; gap: 10px; }
-h2 { margin: 0 0 10px 0; color: #00AA5B; } /* Warna Tokopedia */
-.controls { display: flex; gap: 5px; }
-.btn { flex: 1; padding: 8px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; color: white; }
-.btn:disabled { opacity: 0.5; cursor: not-allowed; }
-.primary { background: #00AA5B; }
-.danger { background: #E02954; }
-.success { background: #2f80ed; }
-.stats { font-size: 12px; color: #666; background: white; padding: 8px; border-radius: 4px; }
-.results-area { height: 400px; overflow-y: auto; background: white; padding: 5px; border-radius: 4px; font-size: 11px; border: 1px solid #ddd; }
-.item-preview { padding: 5px; border-bottom: 1px solid #eee; display: flex; gap: 5px; }
-.item-preview img { width: 30px; height: 30px; object-fit: cover; }
 
-/* Tambahkan ini di styles.css */
+/* HEADER */
+h2 { 
+  margin: 0; color: #00AA5B; font-size: 16px; 
+  border-bottom: 2px solid #e0e0e0; padding-bottom: 8px; 
+}
+
+/* PAGE INDICATOR */
 .page-info {
-  background-color: #e3f2fd; /* Biru muda */
-  color: #0d47a1;
-  padding: 8px;
-  border-radius: 4px;
-  font-size: 11px;
-  font-weight: bold;
-  margin-bottom: 10px;
-  border: 1px solid #bbdefb;
-  text-align: center;
+  padding: 8px; border-radius: 4px; font-size: 11px; font-weight: bold;
+  border: 1px solid #ddd; text-align: center; background: #f5f5f5; color: #666;
 }
 
-.page-info.search {
-  background-color: #fff3e0; /* Oranye muda untuk search */
-  color: #e65100;
-  border-color: #ffe0b2;
+/* CONTROLS (BUTTONS) */
+.controls { display: flex; gap: 8px; }
+.btn { 
+  flex: 1; padding: 10px; border: none; border-radius: 6px; cursor: pointer; 
+  font-weight: 600; font-size: 12px; color: white; transition: opacity 0.2s; 
+}
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn:hover:not(:disabled) { opacity: 0.9; }
+.primary { background: #00AA5B; }
+.success { background: #2f80ed; }
+.danger { background: #E02954; }
+
+/* AUTOMATION PANEL */
+.automation-panel {
+  padding: 10px; background: #fff3e0; border: 1px solid #ffe0b2; border-radius: 6px;
+}
+.automation-panel h3 {
+  margin: 0 0 8px 0; font-size: 12px; color: #e65100;
+}
+.input-group { display: flex; gap: 8px; margin-bottom: 8px; }
+.input-wrapper { flex: 1; }
+.input-wrapper label { font-size: 9px; display: block; color: #666; margin-bottom: 2px; }
+.input-wrapper input { 
+  width: 100%; box-sizing: border-box; padding: 4px; 
+  border: 1px solid #ddd; border-radius: 4px; 
+}
+.auto-status-text {
+  font-size: 10px; color: #666; margin-top: 6px; 
+  font-style: italic; text-align: center;
 }
 
-.page-info.shop {
-  background-color: #e8f5e9; /* Hijau muda untuk toko */
-  color: #1b5e20;
-  border-color: #c8e6c9;
-}
-
-/* Container Detail yang Collapsible */
-.detail-box {
-  background: #fcfcfc;
-  border: 1px solid #eee;
-  border-radius: 4px;
-  margin-top: 8px;
-  padding: 10px;
-  font-size: 11px;
-  color: #333;
-  display: none; /* Hidden by default */
-}
-
-.detail-box.visible {
-  display: block;
-}
-
-/* Gambar Thumbnail */
-.detail-images {
-  display: flex;
-  gap: 5px;
-  overflow-x: auto;
-  margin-bottom: 8px;
-  padding-bottom: 4px;
-}
-
-.detail-images img {
-  width: 40px;
-  height: 40px;
-  object-fit: cover;
-  border-radius: 4px;
-  border: 1px solid #ddd;
-}
-
-/* Teks Deskripsi */
-.val-desc {
-  display: block;
-  white-space: pre-wrap; /* Agar enter/baris baru terbaca */
-  color: #666;
-  margin-top: 4px;
-  max-height: 100px;
-  overflow-y: auto;
-}
-/* ... CSS sebelumnya ... */
-
-/* Search & Filter Styles */
-.search-wrapper {
-  display: flex;
-  gap: 5px;
-  margin-bottom: 8px;
-  align-items: center;
-}
-
+/* SEARCH & FILTER */
+.search-wrapper { display: flex; gap: 5px; align-items: center; }
 .search-wrapper input {
-  flex: 1;
-  padding: 8px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  font-size: 12px;
-  outline: none;
+  flex: 1; padding: 7px; border: 1px solid #ddd; 
+  border-radius: 4px; font-size: 12px; outline: none;
 }
+.search-wrapper input:focus { border-color: #00AA5B; }
 
-.search-wrapper input:focus {
-  border-color: #00AA5B;
-}
-
-/* Toggle NOT Button Styling */
+/* Toggle NOT Button */
 .toggle-not-btn {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 32px;
-  background-color: #eee;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  cursor: pointer;
-  user-select: none;
-  transition: all 0.2s;
+  position: relative; display: inline-flex; align-items: center; justify-content: center;
+  width: 40px; height: 30px; background-color: #eee; border: 1px solid #ddd;
+  border-radius: 4px; cursor: pointer; user-select: none;
+}
+.toggle-not-btn input { display: none; }
+.toggle-not-btn .slider-label { font-size: 10px; font-weight: bold; color: #666; }
+.toggle-not-btn:has(input:checked) { background-color: #ffebee; border-color: #ef9a9a; }
+.toggle-not-btn:has(input:checked) .slider-label { color: #c62828; }
+
+/* SORTING */
+.sort-wrapper { display: flex; gap: 5px; }
+.sort-select {
+  flex: 1; padding: 6px; border: 1px solid #ddd; border-radius: 4px;
+  font-size: 11px; background-color: white; cursor: pointer; outline: none;
 }
 
-.toggle-not-btn input {
-  display: none; /* Sembunyikan checkbox asli */
+/* STATS */
+.stats {
+  font-size: 11px; color: #555; background: white; padding: 8px;
+  border-radius: 6px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+}
+.stats p { margin: 2px 0; }
+#count { font-weight: bold; color: #333; }
+
+/* RESULT LIST (Updated Compact Style) */
+.results-area {
+  height: 400px; overflow-y: auto; background: white; padding: 0;
+  border-radius: 6px; border: 1px solid #eee;
 }
 
-.toggle-not-btn .slider-label {
-  font-size: 10px;
-  font-weight: bold;
-  color: #666;
+.item-preview { 
+  padding: 8px 10px; 
+  border-bottom: 1px solid #f0f0f0; 
+  display: flex; 
+  gap: 10px; 
+  align-items: flex-start;
+  transition: background 0.2s;
+}
+.item-preview:hover { background-color: #f9f9f9; }
+
+/* Thumbnail Kecil */
+.item-thumb {
+  width: 36px; height: 36px; object-fit: cover;
+  border-radius: 4px; border: 1px solid #e0e0e0; flex-shrink: 0; background-color: #f5f5f5;
 }
 
-/* State ketika Aktif (Checked) */
-.toggle-not-btn:has(input:checked) {
-  background-color: #ffebee;
-  border-color: #ef9a9a;
+/* Info Text Wrapper */
+.item-info {
+  flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px;
 }
 
-.toggle-not-btn:has(input:checked) .slider-label {
-  color: #c62828; /* Merah */
+.item-title {
+  font-weight: 600; font-size: 11px; color: #333; 
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+.item-price { color: #00AA5B; font-weight: 700; font-size: 11px; }
+
+.item-meta { font-size: 9px; color: #fa591d; display: flex; align-items: center; gap: 4px; }
+
+.item-shop { font-size: 9px; color: #666; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Action Row & Buttons */
+.action-row { margin-top: 4px; display: flex; align-items: center; justify-content: space-between; }
+
+.shop-badge {
+  padding: 1px 3px; border-radius: 2px; font-weight: bold; font-size: 8px; color: white; margin-right: 4px;
+}
+
+.btn-mini {
+  border: 1px solid #ddd; background: white; border-radius: 3px; cursor: pointer;
+  font-size: 9px; padding: 1px 6px; transition: all 0.1s;
+}
+.btn-mini:hover { background: #f0f0f0; border-color: #ccc; }
+.btn-mini.delete { color: #c62828; border-color: #ffcdd2; background: #ffebee; }
+.btn-mini.open { color: #00AA5B; border-color: #00AA5B; }
+
+/* DETAIL BOX (Collapsible) */
+.detail-box {
+  background: #fbfbfb; border: 1px dashed #ddd; border-radius: 4px;
+  margin-top: 8px; padding: 8px; font-size: 10px; color: #333;
+  display: none;
+}
+.detail-box.visible { display: block; }
+.detail-images { display: flex; gap: 4px; overflow-x: auto; margin-bottom: 5px; }
+.detail-images img {
+  width: 40px; height: 40px; object-fit: cover; border-radius: 4px; border: 1px solid #ccc;
+}
+.val-desc {
+  display: block; white-space: pre-wrap; color: #666; margin-top: 2px;
+  max-height: 80px; overflow-y: auto;
 }

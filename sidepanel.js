@@ -5,7 +5,7 @@ let collectedData = [];
 let uniqueUrls = new Set(); 
 let isAutoRunning = false;
 
-// Referensi Elemen DOM Utama
+// Elemen DOM
 const btnScrape = document.getElementById('btnScrape');
 const btnExport = document.getElementById('btnExport');
 const statusMsg = document.getElementById('status-msg');
@@ -13,34 +13,35 @@ const countLabel = document.getElementById('count');
 const resultsContainer = document.getElementById('results');
 const pageTypeIndicator = document.getElementById('page-type-indicator');
 
-// Referensi Elemen Search & Filter
+// Elemen Search, Filter & Sort
 const searchInput = document.getElementById('searchInput');
 const toggleNot = document.getElementById('toggleNot');
 const filteredCountLabel = document.getElementById('filtered-count');
+const sortBySelect = document.getElementById('sortBy');
+const sortOrderSelect = document.getElementById('sortOrder');
 
-// Referensi Elemen Otomasi
+// Elemen Otomasi
 const btnAutoStart = document.getElementById('btnAutoStart');
 const btnAutoStop = document.getElementById('btnAutoStop');
 const inputDelayMin = document.getElementById('delayMin');
 const inputDelayMax = document.getElementById('delayMax');
 const autoStatusLabel = document.getElementById('auto-status');
 
-// Inisialisasi Teks Tombol Export
 if(btnExport) btnExport.innerText = "Export JSON";
 
 // ==========================================
-// 2. GLOBAL LISTENERS (Tabs & Messages)
+// 2. LISTENERS GLOBAL
 // ==========================================
 
-// Listener pesan dari Content Scripts (PDP Scraper & Highlight response)
+// Listener Pesan dari Content Script (PDP Scraper)
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === "pdp_scraped") {
-    // Handle data detail dan tutup tab pengirim (Auto-Close)
+    // Handle data & tutup tab pengirim (Auto-Close)
     handlePDPData(message.url, message.data, sender.tab ? sender.tab.id : null);
   }
 });
 
-// Auto-Detect Halaman saat panel dibuka/refresh/ganti tab
+// Auto-Detect Halaman
 (async function initPageCheck() {
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -62,57 +63,66 @@ chrome.tabs.onActivated.addListener(async (activeInfo) => {
 });
 
 // ==========================================
-// 3. FITUR SEARCH & FILTER REALTIME
+// 3. SEARCH, FILTER & SORT
 // ==========================================
 searchInput.addEventListener('input', runFilter);
 toggleNot.addEventListener('change', runFilter);
+sortBySelect.addEventListener('change', runSort);
+sortOrderSelect.addEventListener('change', runSort);
 
 function runFilter() {
   const query = searchInput.value.toLowerCase().trim();
   const isNotMode = toggleNot.checked;
-  
   const itemElements = document.querySelectorAll('.item-preview');
   let visibleCount = 0;
 
   itemElements.forEach(el => {
-    // Cari teks di dalam elemen item
     const textContent = el.innerText.toLowerCase();
     const isMatch = textContent.includes(query);
-    
-    let shouldShow = true;
-    if (query === "") {
-      shouldShow = true;
-    } else {
-      shouldShow = isNotMode ? !isMatch : isMatch;
-    }
+    const shouldShow = query === "" ? true : (isNotMode ? !isMatch : isMatch);
 
     el.style.display = shouldShow ? 'flex' : 'none';
     if (shouldShow) visibleCount++;
   });
 
-  // Update UI Counter Filter
   if (filteredCountLabel) {
-    if (query !== "") {
-      filteredCountLabel.style.display = 'inline';
-      filteredCountLabel.innerText = `(Filtered: ${visibleCount})`;
-    } else {
-      filteredCountLabel.style.display = 'none';
-    }
+    filteredCountLabel.style.display = query !== "" ? 'inline' : 'none';
+    filteredCountLabel.innerText = `(Filtered: ${visibleCount})`;
   }
 }
 
+function runSort() {
+  const criteria = sortBySelect.value;
+  const order = sortOrderSelect.value;
+
+  collectedData.sort((a, b) => {
+    let valA, valB;
+    if (criteria === 'newest') {
+      return order === 'asc' ? 1 : -1; // Hack timestamp logic based on array
+    } else {
+      valA = a[criteria]; // price/rating/sold (Number)
+      valB = b[criteria];
+    }
+    return order === 'asc' ? valA - valB : valB - valA;
+  });
+
+  if (criteria === 'newest' && order === 'desc') collectedData.reverse();
+
+  resultsContainer.innerHTML = ''; // Reset UI
+  collectedData.forEach(item => renderItem(item)); // Re-render
+  runFilter(); // Re-apply filter
+}
+
 // ==========================================
-// 4. FITUR OTOMASI (AUTO CLICKER)
+// 4. OTOMASI (AUTO CLICKER)
 // ==========================================
 btnAutoStart.addEventListener('click', async () => {
-  // Hanya ambil tombol yang visible (lolos filter) dan belum diproses
-  // Kita cari container item dulu untuk cek visibility
   const allItems = Array.from(document.querySelectorAll('.item-preview'));
-  
   const buttonsToClick = [];
   
+  // Ambil hanya yang terlihat (lolos filter) dan belum diproses
   allItems.forEach(item => {
-    if (item.style.display !== 'none') { // Hanya yang terlihat
+    if (item.style.display !== 'none') {
       const btn = item.querySelector('.btn-open-scrape:not(.processed)');
       if (btn) buttonsToClick.push(btn);
     }
@@ -127,26 +137,21 @@ btnAutoStart.addEventListener('click', async () => {
   updateAutoUI(true);
   autoStatusLabel.innerText = `Menyiapkan ${buttonsToClick.length} item...`;
 
-  // Shuffle urutan agar lebih humanis
   const shuffledButtons = shuffleArray(buttonsToClick);
   let processedCount = 0;
   
   for (const btn of shuffledButtons) {
     if (!isAutoRunning) break; 
-
-    // Cek keberadaan elemen di DOM (jaga-jaga dihapus user saat proses)
-    if (document.body.contains(btn)) {
+    
+    if (document.body.contains(btn)) { // Cek jika belum dihapus user
       btn.scrollIntoView({ behavior: 'smooth', block: 'center' });
       btn.click();
-      
       processedCount++;
       autoStatusLabel.innerText = `Memproses ${processedCount} dari ${buttonsToClick.length}...`;
-
+      
       const min = parseFloat(inputDelayMin.value) * 1000;
       const max = parseFloat(inputDelayMax.value) * 1000;
-      const randomDelay = Math.floor(Math.random() * (max - min + 1) + min);
-
-      await sleep(randomDelay);
+      await sleep(Math.floor(Math.random() * (max - min + 1) + min));
     }
   }
 
@@ -162,7 +167,7 @@ btnAutoStop.addEventListener('click', () => {
 });
 
 // ==========================================
-// 5. HANDLER SCRAPING UTAMA (LISTING)
+// 5. HANDLER SCRAPING (LISTING)
 // ==========================================
 btnScrape.addEventListener('click', async () => {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -199,11 +204,20 @@ function processNewData(items) {
   let newCount = 0;
   items.forEach(item => {
     if (item.productUrl && !uniqueUrls.has(item.productUrl)) {
-      // Data enrichment
+      // Parsing Info Toko
       item.shopUsername = extractUsername(item.productUrl);
       const parsedShop = parseShopData(item.shopLocation);
       item.cleanShopName = parsedShop.name;
       item.cleanLocation = parsedShop.location;
+
+      // Formatting (Penting untuk Sort & Clean JSON)
+      item.originalPrice = item.price; 
+      item.price = DataFormatter.price(item.price); // Integer
+      item.originalRating = item.rating;
+      item.rating = DataFormatter.rating(item.rating); // Float
+      item.originalSold = item.sold;
+      item.sold = DataFormatter.sold(item.sold); // Integer
+      item.timestamp = Date.now();
 
       uniqueUrls.add(item.productUrl);
       collectedData.push(item);
@@ -216,50 +230,52 @@ function processNewData(items) {
   if (newCount > 0) {
     updateStatus(`+${newCount} produk.`, "green");
     btnExport.disabled = false;
-    
-    // Jalankan filter jika sedang ada query pencarian aktif
     if (searchInput.value.trim() !== "") runFilter();
   }
 }
 
 // ==========================================
-// 7. RENDER ITEM (UI, LOGIC, HIGHLIGHT)
+// 7. RENDER ITEM (Compact & Clean)
 // ==========================================
 function renderItem(item) {
   const div = document.createElement('div');
   div.className = 'item-preview';
-  div.style.cursor = 'pointer'; // Indikator bisa diklik
+  div.style.cursor = 'pointer'; 
   
-  // ID Unik untuk Container Detail
   const uniqueId = btoa(item.productUrl).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
   div.setAttribute('data-url', item.productUrl); 
 
   // Badge Logic
-  let badgeColor = "#999"; let badgeText = "Regular";
+  let badgeColor = "#999"; let badgeText = "Reg";
   if (item.shopBadge === "Mall") { badgeColor = "#D6001C"; badgeText = "Mall"; }
-  else if (item.shopBadge === "Power Shop") { badgeColor = "#00AA5B"; badgeText = "Power Pro"; }
+  else if (item.shopBadge === "Power Shop") { badgeColor = "#00AA5B"; badgeText = "Pro"; }
 
+  // HTML Layout Compact
   div.innerHTML = `
-    <img src="${item.imageUrl}" alt="img" style="width: 50px; height: 50px; object-fit: cover; border-radius: 4px; border: 1px solid #eee;">
-    <div style="flex: 1; overflow: hidden; padding-left: 10px; display: flex; flex-direction: column; justify-content: center;">
-      <div style="font-weight:600; font-size: 11px; color: #333; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${item.name}">${item.name}</div>
-      <div style="color: #00AA5B; font-weight: bold; font-size: 12px; margin-top: 2px;">${item.price}</div>
-      <div style="font-size: 10px; color: #fa591d; margin-top: 2px;">${item.rating} ⭐ | ${item.sold}</div>
+    <img src="${item.imageUrl}" class="item-thumb" alt="img">
+    
+    <div class="item-info">
+      <div class="item-title" title="${item.name}">${item.name}</div>
       
-      <div class="action-row" style="margin-top: 4px; display: flex; align-items: center; justify-content: space-between;">
-        <div style="display:flex; align-items:center;">
-           <span style="background:${badgeColor}; color:white; padding: 1px 4px; border-radius:3px; font-weight:bold; font-size:9px; margin-right:5px;">${badgeText}</span>
-           <span style="font-size: 10px; color: #555; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 60px;">${item.cleanShopName}</span>
-        </div>
-        
-        <div style="display:flex; gap:3px;">
-          <button class="btn-delete" title="Hapus Item" style="border:1px solid #ffcdd2; background:#ffebee; color:#c62828; border-radius:3px; cursor:pointer; font-size:9px; padding:2px 5px;">🗑️</button>
-          <button class="btn-open-scrape" style="border:1px solid #00AA5B; background:white; color:#00AA5B; border-radius:3px; cursor:pointer; font-size:9px; padding:2px 6px;">🔗 Buka</button>
-        </div>
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <span class="item-price">${item.originalPrice}</span>
+        <span class="item-meta">★ ${item.rating} | ${item.originalSold}</span>
+      </div>
+
+      <div class="item-shop">
+         📍 ${item.cleanLocation} (${item.shopUsername})
       </div>
       
-      <div style="font-size: 9px; color: #888; margin-top: 2px;">
-         📍 ${item.cleanLocation} (${item.shopUsername})
+      <div class="action-row">
+        <div style="display:flex; align-items:center; overflow:hidden;">
+           <span class="shop-badge" style="background:${badgeColor};">${badgeText}</span>
+           <span class="item-shop" style="max-width: 80px;">${item.cleanShopName}</span>
+        </div>
+        
+        <div style="display:flex; gap:4px; flex-shrink:0;">
+          <button class="btn-mini delete" title="Hapus">🗑️</button>
+          <button class="btn-mini open btn-open-scrape">🔗 Detail</button>
+        </div>
       </div>
     </div>
 
@@ -273,79 +289,56 @@ function renderItem(item) {
     </div>
   `;
 
-  // --- A. LOGIKA HIGHLIGHT (CLICK LISTENER) ---
+  // A. Highlight Listener
   div.addEventListener('click', async (e) => {
-    // Cegah highlight jika yang diklik adalah tombol atau area detail
-    if (e.target.closest('button') || e.target.closest('.detail-box')) {
-      return; 
-    }
-
+    if (e.target.closest('button') || e.target.closest('.detail-box')) return;
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (tab && tab.id) {
-      chrome.tabs.sendMessage(tab.id, { 
-        action: "highlight_item", 
-        url: item.productUrl 
-      }).catch(err => console.log("Gagal highlight:", err));
-    }
+    if (tab && tab.id) chrome.tabs.sendMessage(tab.id, { action: "highlight_item", url: item.productUrl }).catch(e=>{});
   });
 
-  // --- B. LOGIKA HAPUS ---
-  const btnDelete = div.querySelector('.btn-delete');
+  // B. Delete Listener
+  const btnDelete = div.querySelector('.delete');
   btnDelete.onclick = (e) => {
-    e.stopPropagation(); // Stop event agar tidak trigger highlight
+    e.stopPropagation();
     div.remove();
     collectedData = collectedData.filter(d => d.productUrl !== item.productUrl);
     uniqueUrls.delete(item.productUrl);
     countLabel.innerText = collectedData.length;
-    
-    // Update counter filter jika sedang aktif
     if (searchInput.value.trim() !== "") runFilter();
-
-    if (collectedData.length === 0) {
-      btnExport.disabled = true;
-      updateStatus("List kosong.", "#666");
-    }
+    if (collectedData.length === 0) { btnExport.disabled = true; updateStatus("List kosong.", "#666"); }
   };
 
-  // --- C. LOGIKA BUKA & SCRAPE ---
+  // C. Open/Detail Listener
   const btnOpen = div.querySelector('.btn-open-scrape');
   const detailBox = div.querySelector(`#detail-${uniqueId}`);
-
   btnOpen.onclick = (e) => {
-    e.stopPropagation(); // Stop event highlight
-    
+    e.stopPropagation();
     btnOpen.classList.add('processed');
-    btnOpen.innerText = "⏳...";
+    btnOpen.innerText = "⏳";
     btnOpen.disabled = true;
     detailBox.classList.add('visible');
     
     const isActive = !isAutoRunning; 
-
     chrome.tabs.create({ url: item.productUrl, active: isActive }, (newTab) => {
       const listener = (tabId, changeInfo, tab) => {
         if (tabId === newTab.id && changeInfo.status === 'complete') {
           chrome.tabs.onUpdated.removeListener(listener);
-          chrome.scripting.executeScript({
-            target: { tabId: tabId },
-            files: ['pdp_patterns.js', 'pdp_scraper.js']
-          });
+          chrome.scripting.executeScript({ target: { tabId: tabId }, files: ['pdp_patterns.js', 'pdp_scraper.js'] });
         }
       };
       chrome.tabs.onUpdated.addListener(listener);
     });
   };
 
-  // APPEND CHILD (Urutan sesuai halaman)
   resultsContainer.appendChild(div); 
 }
 
-// --- Handler Data Detail + AUTO CLOSE ---
+// --- Handler PDP Data ---
 function handlePDPData(url, data, senderTabId) {
   const cleanUrl = url.split('?')[0];
   const itemDiv = document.querySelector(`div[data-url^="${cleanUrl}"]`);
   
-  if (senderTabId) chrome.tabs.remove(senderTabId); // Close Tab
-
+  if (senderTabId) chrome.tabs.remove(senderTabId); // Auto Close
   if (!itemDiv) return;
 
   const uniqueId = btoa(itemDiv.getAttribute('data-url')).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
@@ -358,35 +351,34 @@ function handlePDPData(url, data, senderTabId) {
     btnOpen.style.color = "#ccc";
   }
 
-  if (!detailBox) return;
+  if (detailBox) {
+    const loading = detailBox.querySelector('.status-loading');
+    const content = detailBox.querySelector('.content-detail');
+    const imgContainer = detailBox.querySelector('.detail-images');
+    
+    loading.style.display = 'none';
+    content.style.display = 'block';
+    
+    detailBox.querySelector('.val-desc').innerText = data.description || "-";
+    detailBox.querySelector('.val-stock').innerText = data.stock || "-";
 
-  const loading = detailBox.querySelector('.status-loading');
-  const content = detailBox.querySelector('.content-detail');
-  const imgContainer = detailBox.querySelector('.detail-images');
-  
-  loading.style.display = 'none';
-  content.style.display = 'block';
-  
-  detailBox.querySelector('.val-desc').innerText = data.description || "-";
-  detailBox.querySelector('.val-stock').innerText = data.stock || "-";
+    imgContainer.innerHTML = '';
+    if (data.images && data.images.length > 0) {
+      data.images.slice(0, 5).forEach(src => {
+        const img = document.createElement('img');
+        img.src = src;
+        imgContainer.appendChild(img);
+      });
+    }
 
-  imgContainer.innerHTML = '';
-  if (data.images && data.images.length > 0) {
-    data.images.slice(0, 5).forEach(src => {
-      const img = document.createElement('img');
-      img.src = src;
-      imgContainer.appendChild(img);
-    });
+    if (data.shopLocation) {
+      const locInfo = document.createElement('div');
+      locInfo.style.cssText = "font-size: 9px; color: #555; margin-top: 5px; border-top: 1px dashed #ccc; padding-top: 4px;";
+      locInfo.innerHTML = `<b>Pengiriman:</b> ${data.shopLocation}`;
+      content.appendChild(locInfo);
+    }
   }
 
-  if (data.shopLocation) {
-    const locInfo = document.createElement('div');
-    locInfo.style.cssText = "font-size: 9px; color: #555; margin-top: 5px; border-top: 1px dashed #ccc; padding-top: 4px;";
-    locInfo.innerHTML = `<b>Pengiriman:</b> ${data.shopLocation}`;
-    content.appendChild(locInfo);
-  }
-
-  // Update Data Memory
   const dataIndex = collectedData.findIndex(d => d.productUrl === itemDiv.getAttribute('data-url'));
   if (dataIndex !== -1) {
     collectedData[dataIndex].details = data;
@@ -419,9 +411,11 @@ btnExport.addEventListener('click', () => {
 
     const productEntry = {
       name: item.name,
-      price: typeof DataFormatter !== 'undefined' ? DataFormatter.price(item.price) : item.price,
-      rating: typeof DataFormatter !== 'undefined' ? DataFormatter.rating(item.rating) : item.rating,
-      sold: typeof DataFormatter !== 'undefined' ? DataFormatter.sold(item.sold) : item.sold,
+      price: item.price, 
+      rating: item.rating, 
+      sold: item.sold, 
+      originalPrice: item.originalPrice, 
+      originalSold: item.originalSold,
       imageUrl: item.imageUrl,
       link: item.productUrl,
       detail: null
@@ -454,7 +448,9 @@ btnExport.addEventListener('click', () => {
   document.body.removeChild(link);
 });
 
-// --- Helpers Utilities ---
+// ==========================================
+// 9. HELPERS
+// ==========================================
 function parseShopData(combinedString) {
   if (!combinedString) return { name: "-", location: "-" };
   const parts = combinedString.split(" - ");
