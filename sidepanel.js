@@ -1,10 +1,10 @@
 // ==========================================
-// 1. SETUP & VARIABEL GLOBAL
+// 1. SETUP & STATE MANAGEMENT
 // ==========================================
-let collectedData = []; 
-let uniqueUrls = new Set(); 
+let collectedData = []; // Menyimpan state seluruh data
+let uniqueUrls = new Set(); // Mencegah duplikasi URL produk
 
-// Referensi Elemen DOM
+// Elemen DOM
 const btnScrape = document.getElementById('btnScrape');
 const btnExport = document.getElementById('btnExport');
 const statusMsg = document.getElementById('status-msg');
@@ -12,12 +12,22 @@ const countLabel = document.getElementById('count');
 const resultsContainer = document.getElementById('results');
 const pageTypeIndicator = document.getElementById('page-type-indicator');
 
-// Ubah teks tombol agar sesuai
-btnExport.innerText = "Export JSON";
+// Set text tombol export sesuai format baru
+if(btnExport) btnExport.innerText = "Export JSON";
 
 // ==========================================
-// 2. AUTO-DETECT LISTENERS
+// 2. GLOBAL LISTENERS (Message & Tabs)
 // ==========================================
+
+// Listener Pesan dari Content Scripts (PDP Scraper)
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  // Menangani data detail yang dikirim dari tab produk yang baru dibuka
+  if (message.action === "pdp_scraped") {
+    handlePDPData(message.url, message.data);
+  }
+});
+
+// Auto-Detect: Saat Sidepanel dibuka
 (async function initPageCheck() {
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -25,6 +35,7 @@ btnExport.innerText = "Export JSON";
   } catch (e) { console.log(e); }
 })();
 
+// Auto-Detect: Saat URL berubah (Navigasi SPA)
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   if (changeInfo.status === 'complete' || changeInfo.url) {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
@@ -33,6 +44,7 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   }
 });
 
+// Auto-Detect: Saat ganti Tab Browser
 chrome.tabs.onActivated.addListener(async (activeInfo) => {
   const tab = await chrome.tabs.get(activeInfo.tabId);
   if (tab && tab.url) updatePageIndicator(tab.url);
@@ -44,11 +56,11 @@ chrome.tabs.onActivated.addListener(async (activeInfo) => {
 function updatePageIndicator(url) {
   if (!url.includes('tokopedia.com')) {
     setIndicator("❌ Bukan Halaman Tokopedia", "#ffebee", "#c62828", "#ffcdd2");
-    btnScrape.disabled = true;
+    if(btnScrape) btnScrape.disabled = true;
     return;
   }
 
-  btnScrape.disabled = false;
+  if(btnScrape) btnScrape.disabled = false;
   const type = detectPageType(url);
   
   switch (type.code) {
@@ -62,6 +74,7 @@ function updatePageIndicator(url) {
 }
 
 function setIndicator(text, bg, color, border) {
+  if(!pageTypeIndicator) return;
   pageTypeIndicator.innerText = text;
   pageTypeIndicator.className = 'page-info';
   pageTypeIndicator.style.backgroundColor = bg;
@@ -99,23 +112,25 @@ function detectPageType(urlString) {
 }
 
 // ==========================================
-// 4. HANDLER SCRAPING
+// 4. HANDLER TOMBOL SCRAPE (MAIN)
 // ==========================================
 btnScrape.addEventListener('click', async () => {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   
   if (!tab.url.includes('tokopedia.com')) {
-    updateStatus("Error: Bukan Tokopedia", "red");
+    updateStatus("Error: Buka halaman Tokopedia dulu!", "red");
     return;
   }
 
   updatePageIndicator(tab.url);
-  updateStatus("Sedang memindai...", "orange");
+  updateStatus("Sedang memindai halaman...", "orange");
 
+  // Injeksi file berurutan: Patterns -> Content Script
   chrome.scripting.executeScript({
     target: { tabId: tab.id },
     files: ['patterns.js', 'content.js'] 
   }, () => {
+    
     if (chrome.runtime.lastError) {
       updateStatus("Gagal inject script. Refresh halaman.", "red");
       return;
@@ -126,6 +141,7 @@ btnScrape.addEventListener('click', async () => {
         updateStatus("Koneksi terputus. Refresh halaman.", "red");
         return;
       }
+
       if (response && response.status === "success") {
         processNewData(response.data);
       } else {
@@ -136,12 +152,15 @@ btnScrape.addEventListener('click', async () => {
 });
 
 // ==========================================
-// 5. PROCESSING DATA
+// 5. PROCESSING & PARSING DATA
 // ==========================================
 function processNewData(items) {
   let newCount = 0;
+
   items.forEach(item => {
     if (item.productUrl && !uniqueUrls.has(item.productUrl)) {
+      
+      // Parse Data Tambahan
       item.shopUsername = extractUsername(item.productUrl);
       const parsedShop = parseShopData(item.shopLocation);
       item.cleanShopName = parsedShop.name;
@@ -149,20 +168,22 @@ function processNewData(items) {
 
       uniqueUrls.add(item.productUrl);
       collectedData.push(item);
-      renderItem(item);
+      renderItem(item); // Render ke UI
       newCount++;
     }
   });
 
   countLabel.innerText = collectedData.length;
+  
   if (newCount > 0) {
     updateStatus(`+${newCount} produk baru. Scroll lagi!`, "green");
     btnExport.disabled = false;
   } else {
-    updateStatus("Tidak ada produk baru.", "#666");
+    updateStatus("Tidak ada produk baru di layar.", "#666");
   }
 }
 
+// --- Helper Functions ---
 function parseShopData(combinedString) {
   if (!combinedString) return { name: "-", location: "-" };
   const parts = combinedString.split(" - ");
@@ -187,12 +208,17 @@ function updateStatus(text, color) {
 }
 
 // ==========================================
-// 6. RENDER UI
+// 6. RENDER UI (ITEM + DETAIL LOGIC)
 // ==========================================
 function renderItem(item) {
   const div = document.createElement('div');
   div.className = 'item-preview';
   
+  // ID Unik untuk Container Detail (menggunakan Base64 dari URL agar safe)
+  const uniqueId = btoa(item.productUrl).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+  div.setAttribute('data-url', item.productUrl); // Penanda untuk pencarian balik
+
+  // Logika Warna Badge
   let badgeColor = "#999"; let badgeText = "Regular";
   if (item.shopBadge === "Mall") { badgeColor = "#D6001C"; badgeText = "Mall"; }
   else if (item.shopBadge === "Power Shop") { badgeColor = "#00AA5B"; badgeText = "Power Pro"; }
@@ -200,41 +226,127 @@ function renderItem(item) {
   div.innerHTML = `
     <img src="${item.imageUrl}" alt="img" style="width: 50px; height: 50px; object-fit: cover; border-radius: 4px; border: 1px solid #eee;">
     <div style="flex: 1; overflow: hidden; padding-left: 10px; display: flex; flex-direction: column; justify-content: center;">
-      <div style="font-weight:600; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #333;" title="${item.name}">
-        ${item.name}
-      </div>
-      <div style="color: #00AA5B; font-weight: bold; font-size: 12px; margin-top: 2px;">
-        ${item.price}
-      </div>
+      
+      <div style="font-weight:600; font-size: 11px; color: #333; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${item.name}">${item.name}</div>
+      <div style="color: #00AA5B; font-weight: bold; font-size: 12px; margin-top: 2px;">${item.price}</div>
+      
       <div style="font-size: 10px; color: #fa591d; margin-top: 2px;">
         ${item.rating ? `⭐ ${item.rating}` : ''} ${item.sold ? ` | ${item.sold}` : ''}
       </div>
+
       <div class="action-row" style="margin-top: 4px; display: flex; align-items: center; justify-content: space-between;">
         <div style="display:flex; align-items:center;">
            <span style="background:${badgeColor}; color:white; padding: 1px 4px; border-radius:3px; font-weight:bold; font-size:9px; margin-right:5px;">${badgeText}</span>
-           <span style="font-size: 10px; color: #555; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100px;">${item.cleanShopName}</span>
+           <span style="font-size: 10px; color: #555; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 80px;">${item.cleanShopName}</span>
         </div>
+        
+        <button class="btn-open-scrape" style="border:1px solid #00AA5B; background:white; color:#00AA5B; border-radius:3px; cursor:pointer; font-size:9px; padding:2px 6px;">
+           🔗 Buka & Detail
+        </button>
       </div>
+      
       <div style="font-size: 9px; color: #888; margin-top: 2px;">
-         📍 ${item.cleanLocation}
+         📍 ${item.cleanLocation} (${item.shopUsername})
+      </div>
+    </div>
+
+    <div id="detail-${uniqueId}" class="detail-box">
+      <div class="status-loading">⏳ Membuka tab & mengambil detail...</div>
+      <div class="content-detail" style="display:none;">
+         <div class="detail-images"></div>
+         <p style="margin:2px 0;"><b>Stok:</b> <span class="val-stock">-</span></p>
+         <p style="margin:2px 0;"><b>Deskripsi:</b> <span class="val-desc">-</span></p>
       </div>
     </div>
   `;
 
-  // Append Link Button Logic
-  const actionRow = div.querySelector('.action-row');
-  const btnLink = document.createElement('button');
-  btnLink.innerText = "🔗 Buka";
-  btnLink.style.cssText = "border: 1px solid #ccc; background: #fff; border-radius: 3px; cursor: pointer; font-size: 9px; padding: 1px 5px; margin-left: 5px;";
-  if (typeof LinkHelper !== 'undefined') LinkHelper.attach(btnLink, item.productUrl);
-  else btnLink.onclick = () => window.open(item.productUrl, '_blank');
-  actionRow.appendChild(btnLink);
+  // --- Attach Event Listener ke Tombol Buka ---
+  const btnOpen = div.querySelector('.btn-open-scrape');
+  const detailBox = div.querySelector(`#detail-${uniqueId}`);
+
+  btnOpen.onclick = () => {
+    detailBox.classList.add('visible'); // Tampilkan box detail
+    
+    // Buka Tab Baru
+    chrome.tabs.create({ url: item.productUrl, active: true }, (newTab) => {
+      
+      // Listener: Tunggu tab selesai loading (status: complete)
+      const listener = (tabId, changeInfo, tab) => {
+        if (tabId === newTab.id && changeInfo.status === 'complete') {
+          
+          chrome.tabs.onUpdated.removeListener(listener); // Hapus listener agar hemat memori
+          
+          // Inject PDP Patterns & PDP Scraper
+          chrome.scripting.executeScript({
+            target: { tabId: tabId },
+            files: ['pdp_patterns.js', 'pdp_scraper.js']
+          });
+        }
+      };
+      chrome.tabs.onUpdated.addListener(listener);
+    });
+  };
 
   resultsContainer.appendChild(div); 
 }
 
+// --- Handler Data Detail yang Diterima ---
+function handlePDPData(url, data) {
+  // Normalisasi URL untuk pencarian (remove query params)
+  const cleanUrl = url.split('?')[0];
+  
+  // Cari elemen di sidepanel yang cocok dengan URL ini
+  // Menggunakan selector contains attribute (^=)
+  const itemDiv = document.querySelector(`div[data-url^="${cleanUrl}"]`);
+  
+  if (!itemDiv) {
+    console.warn("Item tidak ditemukan untuk detail:", url);
+    return;
+  }
+
+  // Generate ulang ID unik
+  const uniqueId = btoa(itemDiv.getAttribute('data-url')).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+  const detailBox = document.getElementById(`detail-${uniqueId}`);
+  if (!detailBox) return;
+
+  // Update UI Detail
+  const loading = detailBox.querySelector('.status-loading');
+  const content = detailBox.querySelector('.content-detail');
+  const imgContainer = detailBox.querySelector('.detail-images');
+  
+  loading.style.display = 'none';
+  content.style.display = 'block';
+  
+  detailBox.querySelector('.val-desc').innerText = data.description || "-";
+  detailBox.querySelector('.val-stock').innerText = data.stock || "-";
+
+  // Render Gambar Thumbnail
+  imgContainer.innerHTML = '';
+  if (data.images && data.images.length > 0) {
+    data.images.slice(0, 5).forEach(src => {
+      const img = document.createElement('img');
+      img.src = src;
+      imgContainer.appendChild(img);
+    });
+  }
+
+  // Tampilkan Lokasi Pengiriman jika ada (data dari detail lebih akurat)
+  if (data.shopLocation) {
+    const locInfo = document.createElement('div');
+    locInfo.style.cssText = "font-size: 9px; color: #555; margin-top: 5px; border-top: 1px dashed #ccc; padding-top: 4px;";
+    locInfo.innerHTML = `<b>Pengiriman:</b> ${data.shopLocation}`;
+    content.appendChild(locInfo);
+  }
+
+  // MERGE DATA KE MEMORI (Untuk Export JSON)
+  const dataIndex = collectedData.findIndex(d => d.productUrl === itemDiv.getAttribute('data-url'));
+  if (dataIndex !== -1) {
+    collectedData[dataIndex].details = data;
+  }
+}
+
 // ==========================================
-// 7. EXPORT JSON (DENGAN FORMATTERS)
+// 7. EXPORT NESTED JSON
 // ==========================================
 btnExport.addEventListener('click', () => {
   if (collectedData.length === 0) {
@@ -242,7 +354,7 @@ btnExport.addEventListener('click', () => {
     return;
   }
   
-  // A. TRANSFORMA DATA
+  // Transformasi Data ke Struktur Toko > Produk
   const shopsMap = new Map();
 
   collectedData.forEach(item => {
@@ -255,39 +367,45 @@ btnExport.addEventListener('click', () => {
           name: item.cleanShopName,
           location: item.cleanLocation,
           badge: item.shopBadge,
-          rawLocationString: item.shopLocation 
+          rawLocationString: item.shopLocation
         },
         products: [] 
       });
     }
 
-    // --- PENERAPAN FORMATTER DI SINI ---
-    // Kita bersihkan data mentah menjadi tipe data yang benar
-    shopsMap.get(shopKey).products.push({
+    // Gunakan DataFormatter untuk membersihkan tipe data
+    const productEntry = {
       name: item.name,
+      price: typeof DataFormatter !== 'undefined' ? DataFormatter.price(item.price) : item.price,
+      rating: typeof DataFormatter !== 'undefined' ? DataFormatter.rating(item.rating) : item.rating,
+      sold: typeof DataFormatter !== 'undefined' ? DataFormatter.sold(item.sold) : item.sold,
       
-      // Price: String "Rp..." -> Integer
-      price: DataFormatter.price(item.price), 
+      originalPrice: item.price, // Simpan raw string
+      originalSold: item.sold,   // Simpan raw string
       
-      // Rating: String "4.9" -> Float 4.9
-      rating: DataFormatter.rating(item.rating), 
-      
-      // Sold: String "100+ terjual" -> Integer 101
-      sold: DataFormatter.sold(item.sold), 
-      
-      // Simpan juga string aslinya jika butuh referensi (opsional)
-      originalPrice: item.price, 
-      originalSold: item.sold,
-
       imageUrl: item.imageUrl,
-      link: item.productUrl
-    });
-    // -----------------------------------
+      link: item.productUrl,
+      
+      // Data Detail (Jika sudah discrape)
+      detail: null
+    };
+
+    if (item.details) {
+      productEntry.detail = {
+        fullName: item.details.fullName,
+        description: item.details.description,
+        stock: item.details.stock, // Angka/String stok
+        images: item.details.images,
+        shopLocationFromDetail: item.details.shopLocation
+      };
+    }
+
+    shopsMap.get(shopKey).products.push(productEntry);
   });
 
   const finalJsonData = Array.from(shopsMap.values());
 
-  // B. BUAT FILE DOWNLOAD
+  // Download File JSON
   const jsonString = JSON.stringify(finalJsonData, null, 2); 
   const blob = new Blob([jsonString], { type: 'application/json' });
   const url = URL.createObjectURL(blob);

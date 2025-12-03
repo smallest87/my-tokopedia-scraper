@@ -36,3 +36,46 @@ h2 { margin: 0 0 10px 0; color: #00AA5B; } /* Warna Tokopedia */
   color: #1b5e20;
   border-color: #c8e6c9;
 }
+
+/* Container Detail yang Collapsible */
+.detail-box {
+  background: #fcfcfc;
+  border: 1px solid #eee;
+  border-radius: 4px;
+  margin-top: 8px;
+  padding: 10px;
+  font-size: 11px;
+  color: #333;
+  display: none; /* Hidden by default */
+}
+
+.detail-box.visible {
+  display: block;
+}
+
+/* Gambar Thumbnail */
+.detail-images {
+  display: flex;
+  gap: 5px;
+  overflow-x: auto;
+  margin-bottom: 8px;
+  padding-bottom: 4px;
+}
+
+.detail-images img {
+  width: 40px;
+  height: 40px;
+  object-fit: cover;
+  border-radius: 4px;
+  border: 1px solid #ddd;
+}
+
+/* Teks Deskripsi */
+.val-desc {
+  display: block;
+  white-space: pre-wrap; /* Agar enter/baris baru terbaca */
+  color: #666;
+  margin-top: 4px;
+  max-height: 100px;
+  overflow-y: auto;
+}
