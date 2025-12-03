@@ -1,9 +1,12 @@
 if (typeof window.SCRAPER_CONFIG === 'undefined') {
   window.SCRAPER_CONFIG = {
-    // Selector container utama
-    cardContainer: '.css-5wh65g', 
+    // UPDATED: Selector Container Dinamis
+    containers: {
+      search: '.css-5wh65g', // Halaman Pencarian
+      shop: '.css-79elbk'    // Halaman Produk Toko
+    },
 
-    // Pola Regex untuk deteksi teks (Harga, Rating, dll)
+    // Pola Regex (Tetap sama)
     patterns: {
       price: /^Rp\s?[\d\.]+/i,
       rating: /^[1-5]\.\d$/,
@@ -11,24 +14,11 @@ if (typeof window.SCRAPER_CONFIG === 'undefined') {
       discount: /^\d{1,2}%$/
     },
 
-    // --- LOGIKA BARU: DETEKSI BADGE ---
-    // Mencocokkan bagian dari URL gambar (src) dengan Nama Badge
+    // Pola Badge (Tetap sama)
     badgePatterns: [
-      {
-        id: "Mall",
-        // Mencocokkan "badge_os.png" atau variannya
-        regex: /badge_os\.png/i 
-      },
-      {
-        id: "Power Shop",
-        // Mencocokkan "Power Merchant Pro" (URL encoded atau tidak)
-        regex: /Power%20Merchant%20Pro|Power_Merchant_Pro/i
-      },
-      {
-        id: "Power Merchant",
-        // Fallback untuk PM biasa (jika ada)
-        regex: /Power%20Merchant(?!%20Pro)|Power_Merchant(?!_Pro)/i
-      }
+      { id: "Mall", regex: /badge_os\.png/i },
+      { id: "Power Shop", regex: /Power%20Merchant%20Pro|Power_Merchant_Pro/i },
+      { id: "Power Merchant", regex: /Power%20Merchant(?!%20Pro)|Power_Merchant(?!_Pro)/i }
     ]
   };
 }

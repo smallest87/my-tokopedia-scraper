@@ -13,14 +13,33 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 function scrapeWithHeuristics() {
   const CONFIG = window.SCRAPER_CONFIG;
   const products = [];
-  const cards = document.querySelectorAll(CONFIG.cardContainer);
+  
+  // --- LOGIKA PEMILIHAN SELECTOR ---
+  let activeSelector = CONFIG.containers.search; // Default
+  const currentPath = window.location.pathname;
+
+  // Cek apakah ini halaman pencarian atau halaman toko
+  if (currentPath.startsWith('/search')) {
+    console.log("Mode: Search Page Scraping");
+    activeSelector = CONFIG.containers.search;
+  } else {
+    console.log("Mode: Shop Page Scraping");
+    activeSelector = CONFIG.containers.shop;
+  }
+  // ---------------------------------
+
+  const cards = document.querySelectorAll(activeSelector);
+  
+  // Debugging: Cek jika selector salah/tidak ada item
+  if (cards.length === 0) {
+    console.warn(`Tidak ada item ditemukan dengan selector: ${activeSelector}`);
+  }
 
   cards.forEach((card) => {
     try {
       let itemData = {
         name: "", price: "", rating: "", sold: "", shopLocation: "", 
-        imageUrl: "", productUrl: "", 
-        shopBadge: "Regular" // Default jika tidak ada badge
+        imageUrl: "", productUrl: "", shopBadge: "Regular"
       };
 
       // 1. AMBIL LINK
@@ -28,31 +47,24 @@ function scrapeWithHeuristics() {
       if (!anchor || !anchor.href) return;
       itemData.productUrl = anchor.href;
 
-      // 2. AMBIL SEMUA GAMBAR (Produk & Badge)
+      // 2. AMBIL GAMBAR
       const allImages = Array.from(card.querySelectorAll('img'));
-      
-      // Gambar produk biasanya adalah gambar pertama atau yang terbesar
-      // Kita asumsikan gambar pertama adalah gambar produk
       if (allImages.length > 0) {
+        // Logika prioritas gambar: 
+        // Di halaman toko, kadang gambar produk bukan yg pertama. 
+        // Tapi untuk simplifikasi kita ambil index 0 dulu.
         itemData.imageUrl = allImages[0].src;
       }
 
-      // --- LOGIKA DETEKSI BADGE ---
-      // Loop semua gambar di card untuk mencari yang cocok dengan pola badge
+      // Deteksi Badge
       for (const img of allImages) {
-        const src = img.src;
-        let foundBadge = false;
-
         for (const badgePattern of CONFIG.badgePatterns) {
-          if (badgePattern.regex.test(src)) {
+          if (badgePattern.regex.test(img.src)) {
             itemData.shopBadge = badgePattern.id;
-            foundBadge = true;
             break; 
           }
         }
-        if (foundBadge) break; // Jika sudah ketemu, stop cari badge lain
       }
-      // ----------------------------
 
       // 3. HEURISTIC TEXT
       const rawText = card.innerText; 
@@ -66,7 +78,8 @@ function scrapeWithHeuristics() {
         if (CONFIG.patterns.sold.test(text)) { itemData.sold = text; return; }
         if (CONFIG.patterns.discount.test(text)) return;
 
-        if (text.length > 20) {
+        // Filter Judul vs Info Lain
+        if (text.length > 15) { // Sedikit diturunkan threshold-nya
           potentialTitles.push(text);
         } else {
           if (text.length > 3) potentialShops.push(text);

@@ -11,3 +11,28 @@ h2 { margin: 0 0 10px 0; color: #00AA5B; } /* Warna Tokopedia */
 .results-area { height: 400px; overflow-y: auto; background: white; padding: 5px; border-radius: 4px; font-size: 11px; border: 1px solid #ddd; }
 .item-preview { padding: 5px; border-bottom: 1px solid #eee; display: flex; gap: 5px; }
 .item-preview img { width: 30px; height: 30px; object-fit: cover; }
+
+/* Tambahkan ini di styles.css */
+.page-info {
+  background-color: #e3f2fd; /* Biru muda */
+  color: #0d47a1;
+  padding: 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: bold;
+  margin-bottom: 10px;
+  border: 1px solid #bbdefb;
+  text-align: center;
+}
+
+.page-info.search {
+  background-color: #fff3e0; /* Oranye muda untuk search */
+  color: #e65100;
+  border-color: #ffe0b2;
+}
+
+.page-info.shop {
+  background-color: #e8f5e9; /* Hijau muda untuk toko */
+  color: #1b5e20;
+  border-color: #c8e6c9;
+}
