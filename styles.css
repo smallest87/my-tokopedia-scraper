@@ -79,3 +79,61 @@ h2 { margin: 0 0 10px 0; color: #00AA5B; } /* Warna Tokopedia */
   max-height: 100px;
   overflow-y: auto;
 }
+/* ... CSS sebelumnya ... */
+
+/* Search & Filter Styles */
+.search-wrapper {
+  display: flex;
+  gap: 5px;
+  margin-bottom: 8px;
+  align-items: center;
+}
+
+.search-wrapper input {
+  flex: 1;
+  padding: 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 12px;
+  outline: none;
+}
+
+.search-wrapper input:focus {
+  border-color: #00AA5B;
+}
+
+/* Toggle NOT Button Styling */
+.toggle-not-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 32px;
+  background-color: #eee;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.2s;
+}
+
+.toggle-not-btn input {
+  display: none; /* Sembunyikan checkbox asli */
+}
+
+.toggle-not-btn .slider-label {
+  font-size: 10px;
+  font-weight: bold;
+  color: #666;
+}
+
+/* State ketika Aktif (Checked) */
+.toggle-not-btn:has(input:checked) {
+  background-color: #ffebee;
+  border-color: #ef9a9a;
+}
+
+.toggle-not-btn:has(input:checked) .slider-label {
+  color: #c62828; /* Merah */
+}

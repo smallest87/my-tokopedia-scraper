@@ -3,9 +3,9 @@
 // ==========================================
 let collectedData = []; 
 let uniqueUrls = new Set(); 
-let isAutoRunning = false; // Flag untuk kontrol loop otomasi
+let isAutoRunning = false;
 
-// Elemen DOM Dasar
+// Elemen DOM
 const btnScrape = document.getElementById('btnScrape');
 const btnExport = document.getElementById('btnExport');
 const statusMsg = document.getElementById('status-msg');
@@ -25,16 +25,12 @@ if(btnExport) btnExport.innerText = "Export JSON";
 // ==========================================
 // 2. LISTENERS GLOBAL
 // ==========================================
-
-// Listener Pesan (Data Detail Masuk)
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === "pdp_scraped") {
-    // Kirim ID Tab pengirim agar bisa kita tutup
     handlePDPData(message.url, message.data, sender.tab ? sender.tab.id : null);
   }
 });
 
-// Auto-Detect Page Logic
 (async function initPageCheck() {
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -56,55 +52,46 @@ chrome.tabs.onActivated.addListener(async (activeInfo) => {
 });
 
 // ==========================================
-// 3. LOGIKA OTOMASI (AUTO SCRAPER)
+// 3. LOGIKA OTOMASI
 // ==========================================
-
 btnAutoStart.addEventListener('click', async () => {
-  // 1. Kumpulkan semua tombol "Buka & Detail" yang belum selesai
-  // Kita cari tombol yang belum punya class 'processed'
+  // Hanya ambil tombol yang ada di DOM (artinya item yang belum dihapus user)
   const buttons = Array.from(document.querySelectorAll('.btn-open-scrape:not(.processed)'));
 
   if (buttons.length === 0) {
-    autoStatusLabel.innerText = "Tidak ada item untuk diproses.";
+    autoStatusLabel.innerText = "Tidak ada item (atau semua sudah selesai).";
     return;
   }
 
-  // 2. Setup State
   isAutoRunning = true;
   updateAutoUI(true);
   autoStatusLabel.innerText = `Menyiapkan ${buttons.length} item...`;
 
-  // 3. Acak Urutan (Shuffle)
   const shuffledButtons = shuffleArray(buttons);
-
-  // 4. Eksekusi Loop
   let processedCount = 0;
   
   for (const btn of shuffledButtons) {
-    if (!isAutoRunning) break; // Cek tombol stop
+    if (!isAutoRunning) break; 
 
-    // Scroll ke elemen agar user tahu mana yang sedang dikerjakan
-    btn.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    
-    // Klik tombolnya (ini akan memicu logika btnOpen.onclick di renderItem)
-    // Kita tambahkan flag 'auto-click' agar logic tahu ini otomatis
-    btn.click();
-    
-    processedCount++;
-    autoStatusLabel.innerText = `Memproses ${processedCount} dari ${buttons.length} (Acak)...`;
+    // Cek apakah item masih ada di DOM (jaga-jaga jika user menghapus saat bot jalan)
+    if (document.body.contains(btn)) {
+      btn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      btn.click();
+      
+      processedCount++;
+      autoStatusLabel.innerText = `Memproses ${processedCount} dari ${buttons.length}...`;
 
-    // 5. Hitung Delay Humanize
-    const min = parseFloat(inputDelayMin.value) * 1000;
-    const max = parseFloat(inputDelayMax.value) * 1000;
-    const randomDelay = Math.floor(Math.random() * (max - min + 1) + min);
+      const min = parseFloat(inputDelayMin.value) * 1000;
+      const max = parseFloat(inputDelayMax.value) * 1000;
+      const randomDelay = Math.floor(Math.random() * (max - min + 1) + min);
 
-    // Tunggu sebelum lanjut ke item berikutnya
-    await sleep(randomDelay);
+      await sleep(randomDelay);
+    }
   }
 
   isAutoRunning = false;
   updateAutoUI(false);
-  autoStatusLabel.innerText = isAutoRunning ? "Berhenti." : "Selesai semua!";
+  autoStatusLabel.innerText = isAutoRunning ? "Berhenti." : "Selesai antrean.";
 });
 
 btnAutoStop.addEventListener('click', () => {
@@ -113,11 +100,7 @@ btnAutoStop.addEventListener('click', () => {
   autoStatusLabel.innerText = "Berhenti paksa...";
 });
 
-// --- Helper Automation ---
-function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
-
+function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
 function shuffleArray(array) {
   for (let i = array.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
@@ -125,7 +108,6 @@ function shuffleArray(array) {
   }
   return array;
 }
-
 function updateAutoUI(running) {
   btnAutoStart.disabled = running;
   btnAutoStop.disabled = !running;
@@ -145,19 +127,16 @@ btnScrape.addEventListener('click', async () => {
   }
 
   updatePageIndicator(tab.url);
-  updateStatus("Sedang memindai halaman...", "orange");
+  updateStatus("Sedang memindai...", "orange");
 
   chrome.scripting.executeScript({
     target: { tabId: tab.id },
     files: ['patterns.js', 'content.js'] 
   }, () => {
-    if (chrome.runtime.lastError) {
-      updateStatus("Gagal inject. Refresh.", "red");
-      return;
-    }
+    if (chrome.runtime.lastError) return updateStatus("Gagal inject.", "red");
+    
     chrome.tabs.sendMessage(tab.id, { action: "scrape_visible" }, (response) => {
       if (chrome.runtime.lastError) return updateStatus("Koneksi putus.", "red");
-      
       if (response && response.status === "success") {
         processNewData(response.data);
       } else {
@@ -192,7 +171,7 @@ function processNewData(items) {
   }
 }
 
-// --- Basic Helpers ---
+// Helpers
 function parseShopData(combinedString) {
   if (!combinedString) return { name: "-", location: "-" };
   const parts = combinedString.split(" - ");
@@ -201,7 +180,6 @@ function parseShopData(combinedString) {
   const name = parts.join(" - "); 
   return { name, location };
 }
-
 function extractUsername(urlString) {
   try {
     const url = new URL(urlString);
@@ -210,7 +188,6 @@ function extractUsername(urlString) {
     return "-";
   } catch (e) { return "-"; }
 }
-
 function detectPageType(urlString) {
   try {
     const url = new URL(urlString);
@@ -220,24 +197,21 @@ function detectPageType(urlString) {
     return { code: 'other', label: "📄 Tokopedia" };
   } catch (e) { return { code: 'unknown', label: "?" }; }
 }
-
 function updatePageIndicator(url) {
   if(!pageTypeIndicator) return;
   const type = detectPageType(url);
   pageTypeIndicator.innerText = type.label;
-  
   if(type.code === 'search') pageTypeIndicator.style.backgroundColor = "#fff3e0";
   else if(type.code === 'shop_list') pageTypeIndicator.style.backgroundColor = "#e8f5e9";
   else pageTypeIndicator.style.backgroundColor = "#f5f5f5";
 }
-
 function updateStatus(text, color) {
   statusMsg.innerText = text;
   statusMsg.style.color = color;
 }
 
 // ==========================================
-// 6. RENDER UI & DETAIL LOGIC (UPDATED)
+// 6. RENDER UI & DELETE LOGIC (UPDATED)
 // ==========================================
 function renderItem(item) {
   const div = document.createElement('div');
@@ -260,12 +234,22 @@ function renderItem(item) {
       <div class="action-row" style="margin-top: 4px; display: flex; align-items: center; justify-content: space-between;">
         <div style="display:flex; align-items:center;">
            <span style="background:${badgeColor}; color:white; padding: 1px 4px; border-radius:3px; font-weight:bold; font-size:9px; margin-right:5px;">${badgeText}</span>
-           <span style="font-size: 10px; color: #555; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 80px;">${item.cleanShopName}</span>
+           <span style="font-size: 10px; color: #555; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 60px;">${item.cleanShopName}</span>
         </div>
         
-        <button class="btn-open-scrape" style="border:1px solid #00AA5B; background:white; color:#00AA5B; border-radius:3px; cursor:pointer; font-size:9px; padding:2px 6px;">
-           🔗 Buka & Detail
-        </button>
+        <div style="display:flex; gap:3px;">
+          <button class="btn-delete" title="Hapus Item" style="border:1px solid #ffcdd2; background:#ffebee; color:#c62828; border-radius:3px; cursor:pointer; font-size:9px; padding:2px 5px;">
+            🗑️
+          </button>
+          
+          <button class="btn-open-scrape" style="border:1px solid #00AA5B; background:white; color:#00AA5B; border-radius:3px; cursor:pointer; font-size:9px; padding:2px 6px;">
+             🔗 Buka
+          </button>
+        </div>
+      </div>
+      
+      <div style="font-size: 9px; color: #888; margin-top: 2px;">
+         📍 ${item.cleanLocation} (${item.shopUsername})
       </div>
     </div>
 
@@ -279,27 +263,44 @@ function renderItem(item) {
     </div>
   `;
 
+  // --- LOGIKA TOMBOL HAPUS ---
+  const btnDelete = div.querySelector('.btn-delete');
+  btnDelete.onclick = () => {
+    // 1. Hapus dari DOM (Tampilan)
+    div.remove();
+
+    // 2. Hapus dari Memory (Data Array)
+    collectedData = collectedData.filter(d => d.productUrl !== item.productUrl);
+
+    // 3. Hapus dari Unique Set (Agar bisa discrape ulang jika mau)
+    uniqueUrls.delete(item.productUrl);
+
+    // 4. Update Counter UI
+    countLabel.innerText = collectedData.length;
+    
+    // 5. Update status
+    if (collectedData.length === 0) {
+      btnExport.disabled = true;
+      updateStatus("List kosong.", "#666");
+    }
+  };
+
+  // --- LOGIKA TOMBOL BUKA & SCRAPE (Sama) ---
   const btnOpen = div.querySelector('.btn-open-scrape');
   const detailBox = div.querySelector(`#detail-${uniqueId}`);
 
   btnOpen.onclick = () => {
-    // Tandai tombol sebagai 'processed' agar tidak diklik ulang oleh bot
     btnOpen.classList.add('processed');
-    btnOpen.innerText = "⏳ Loading...";
+    btnOpen.innerText = "⏳...";
     btnOpen.disabled = true;
-
     detailBox.classList.add('visible');
     
-    // Buka Tab (Active: false agar tidak mengganggu user jika auto, tapi true jika manual klik)
-    // Kita gunakan active: false agar automation tidak 'jumping' focus terus menerus
     const isActive = !isAutoRunning; 
 
     chrome.tabs.create({ url: item.productUrl, active: isActive }, (newTab) => {
-      
       const listener = (tabId, changeInfo, tab) => {
         if (tabId === newTab.id && changeInfo.status === 'complete') {
           chrome.tabs.onUpdated.removeListener(listener);
-          
           chrome.scripting.executeScript({
             target: { tabId: tabId },
             files: ['pdp_patterns.js', 'pdp_scraper.js']
@@ -316,22 +317,20 @@ function renderItem(item) {
 // --- Handler Data Detail + AUTO CLOSE ---
 function handlePDPData(url, data, senderTabId) {
   const cleanUrl = url.split('?')[0];
+  // Gunakan pencarian DOM yang aman
+  // Karena user mungkin sudah menghapus item saat tab loading
   const itemDiv = document.querySelector(`div[data-url^="${cleanUrl}"]`);
   
-  // Jika tab pengirim ada, TUTUP TAB-nya (Fitur Auto-Close)
-  if (senderTabId) {
-    chrome.tabs.remove(senderTabId);
-  }
+  if (senderTabId) chrome.tabs.remove(senderTabId);
 
-  if (!itemDiv) return;
+  if (!itemDiv) return; // Jika item sudah dihapus user, abaikan data yang masuk
 
   const uniqueId = btoa(itemDiv.getAttribute('data-url')).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
   const detailBox = document.getElementById(`detail-${uniqueId}`);
   const btnOpen = itemDiv.querySelector('.btn-open-scrape');
 
-  // Update Tombol jadi 'Done'
   if (btnOpen) {
-    btnOpen.innerText = "✔ Selesai";
+    btnOpen.innerText = "✔";
     btnOpen.style.borderColor = "#ccc";
     btnOpen.style.color = "#ccc";
   }
@@ -430,3 +429,72 @@ btnExport.addEventListener('click', () => {
   link.click();
   document.body.removeChild(link);
 });
+
+// ==========================================
+// 8. REALTIME SEARCH & FILTER
+// ==========================================
+const searchInput = document.getElementById('searchInput');
+const toggleNot = document.getElementById('toggleNot');
+const filteredCountLabel = document.getElementById('filtered-count');
+
+// Event Listener untuk Input Ketik & Toggle Klik
+searchInput.addEventListener('input', runFilter);
+toggleNot.addEventListener('change', runFilter);
+
+function runFilter() {
+  const query = searchInput.value.toLowerCase().trim();
+  const isNotMode = toggleNot.checked;
+  
+  // Ambil semua elemen item di DOM saat ini
+  const itemElements = document.querySelectorAll('.item-preview');
+  let visibleCount = 0;
+
+  itemElements.forEach(el => {
+    // Kita cari teks di dalam elemen tersebut (Nama, Toko, Harga, dll)
+    const textContent = el.innerText.toLowerCase();
+    
+    // Logika Pencarian
+    const isMatch = textContent.includes(query);
+    
+    let shouldShow = true;
+
+    if (query === "") {
+      shouldShow = true; // Jika kosong, tampilkan semua
+    } else {
+      if (isNotMode) {
+        // Mode NOT: Tampilkan jika TIDAK COCOK
+        shouldShow = !isMatch;
+      } else {
+        // Mode Normal: Tampilkan jika COCOK
+        shouldShow = isMatch;
+      }
+    }
+
+    // Terapkan visibility
+    el.style.display = shouldShow ? 'flex' : 'none';
+    
+    if (shouldShow) visibleCount++;
+  });
+
+  // Update UI Counter Kecil
+  if (query !== "") {
+    filteredCountLabel.style.display = 'inline';
+    filteredCountLabel.innerText = `(Filtered: ${visibleCount})`;
+  } else {
+    filteredCountLabel.style.display = 'none';
+  }
+}
+
+// Update fungsi renderItem sedikit agar filter tetap jalan saat item baru masuk
+// (Opsional, tapi bagus untuk UX)
+const originalRenderItem = renderItem; 
+renderItem = function(item) {
+  // Panggil render asli
+  originalRenderItem(item);
+  
+  // Jika sedang ada search query aktif, langsung jalankan filter ulang
+  // agar item baru yang tidak sesuai query langsung tersembunyi
+  if (searchInput.value.trim() !== "") {
+    runFilter();
+  }
+}

@@ -167,6 +167,22 @@
       <p>Status: <span id="status-msg" style="color: #666;">Siap.</span></p>
     </div>
 
+    <div class="stats">
+        <p>Total Item: <span id="count">0</span> <span id="filtered-count" style="font-weight:normal; color:#888; display:none;"></span></p>
+        <p>Status: <span id="status-msg" style="color: #666;">Siap.</span></p>
+        </div>
+
+        <div class="search-wrapper">
+        <input type="text" id="searchInput" placeholder="Cari nama, harga, atau toko..." autocomplete="off">
+        
+        <label class="toggle-not-btn" title="Mode NOT: Sembunyikan yang cocok">
+            <input type="checkbox" id="toggleNot">
+            <span class="slider-label">NOT</span>
+        </label>
+        </div>
+        <div id="results" class="results-area"></div>
+    </div>
+
     <div id="results" class="results-area"></div>
   </div>
 
