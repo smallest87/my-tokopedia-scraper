@@ -48,7 +48,7 @@ btnScrape.addEventListener('click', async () => {
 });
 
 // ==========================================
-// 2. LOGIKA UTAMA (Processing + Extraction)
+// 2. LOGIKA UTAMA (Processing + Parsing)
 // ==========================================
 function processNewData(items) {
   let newCount = 0;
@@ -56,9 +56,13 @@ function processNewData(items) {
   items.forEach(item => {
     if (item.productUrl && !uniqueUrls.has(item.productUrl)) {
       
-      // --- LOGIKA EKSTRAKSI USERNAME ---
+      // 1. Ekstrak Username dari URL
       item.shopUsername = extractUsername(item.productUrl);
-      // ---------------------------------
+
+      // 2. Parsing Nama Toko dan Lokasi (LOGIKA BARU)
+      const parsedShop = parseShopData(item.shopLocation);
+      item.cleanShopName = parsedShop.name;
+      item.cleanLocation = parsedShop.location;
 
       uniqueUrls.add(item.productUrl);
       collectedData.push(item);
@@ -77,22 +81,36 @@ function processNewData(items) {
   }
 }
 
-// Fungsi Helper untuk mengambil username dari URL
+// --- Helper: Parsing String "Nama - Lokasi" ---
+function parseShopData(combinedString) {
+  if (!combinedString) return { name: "-", location: "-" };
+
+  // Pecah berdasarkan separator yang kita buat di content.js
+  const parts = combinedString.split(" - ");
+
+  // Jika cuma ada 1 bagian (misal data lokasi tidak terbaca)
+  if (parts.length === 1) {
+    return { name: parts[0], location: "-" };
+  }
+
+  // Logika: Elemen terakhir biasanya Lokasi (Kota/Kab), sisanya Nama Toko
+  const location = parts.pop(); // Ambil elemen terakhir
+  const name = parts.join(" - "); // Gabung sisanya (jika nama toko ada strip-nya)
+
+  return { name, location };
+}
+
+// --- Helper: Ekstrak Username URL ---
 function extractUsername(urlString) {
   try {
     const url = new URL(urlString);
-    // Pathname contoh: /ghmusicgraharaya/nama-produk...
     const segments = url.pathname.split('/');
-    
-    // Segmen index 0 adalah string kosong (karena diawali /)
-    // Segmen index 1 adalah username toko
     if (segments.length > 1 && segments[1]) {
       return segments[1];
     }
     return "-";
   } catch (e) {
-    console.error("Gagal ekstrak username:", e);
-    return "error";
+    return "-";
   }
 }
 
@@ -116,12 +134,13 @@ function renderItem(item) {
       </div>
       
       <div style="font-size: 10px; color: #555; margin-top: 2px;">
-        👤 <span style="background:#eee; padding: 1px 4px; border-radius:3px;">${item.shopUsername}</span>
+        🛒 <b>${item.cleanShopName}</b> (${item.shopUsername})
+      </div>
+      
+      <div style="font-size: 10px; color: #888; margin-top: 1px;">
+         📍 ${item.cleanLocation}
       </div>
 
-      <div style="font-size: 10px; color: #888; margin-top: 2px;">
-        ${item.shopLocation || '-'}
-      </div>
     </div>
   `;
   
@@ -129,30 +148,32 @@ function renderItem(item) {
 }
 
 // ==========================================
-// 4. EXPORT CSV (Updated Header)
+// 4. EXPORT CSV (Updated Columns)
 // ==========================================
 btnExport.addEventListener('click', () => {
   if (collectedData.length === 0) return;
   
   const headers = [
-    "Username Toko", // Kolom Baru
+    "Username Toko", 
+    "Nama Toko",    // Kolom Baru
+    "Lokasi Toko",  // Kolom Baru
     "Nama Produk", 
     "Harga", 
     "Rating", 
     "Terjual", 
-    "Lokasi Manual", 
     "Link Gambar", 
     "Link Produk"
   ];
   
   const csvRows = collectedData.map(item => {
     return [
-      escapeCsv(item.shopUsername), // Data Baru
+      escapeCsv(item.shopUsername),
+      escapeCsv(item.cleanShopName), // Data hasil parsing
+      escapeCsv(item.cleanLocation), // Data hasil parsing
       escapeCsv(item.name),
       escapeCsv(item.price),
       escapeCsv(item.rating),
       escapeCsv(item.sold),
-      escapeCsv(item.shopLocation),
       escapeCsv(item.imageUrl),
       escapeCsv(item.productUrl)
     ].join(",");
